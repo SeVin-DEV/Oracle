@@ -1,0 +1,502 @@
+
+╔══════════════════════════════════════════════════════════════════════════════╗
+║           🖤 7-AGENT-1 + ORACLE 26ai — ULTIMATE SETUP CHEAT SHEET 🖤          ║
+║                     For Oracle E2.1 + Ubuntu 24.04 LTS                      ║
+╚══════════════════════════════════════════════════════════════════════════════╝
+
+═══════════════════════════════════════════════════════════════════════════════
+ STEP 0: PRE-REQUISITES (Do These First!)
+═══════════════════════════════════════════════════════════════════════════════
+
+  [✓] Oracle Cloud Account with E2.1 instance running
+  [✓] Oracle 26ai Autonomous Database created (Always Free tier works!)
+  [✓] OCI CLI installed and configured on your local machine
+  [✓] SSH key pair for your E2.1 instance
+  [✓] Database wallet downloaded (you'll need this!)
+
+═══════════════════════════════════════════════════════════════════════════════
+ STEP 1: SSH INTO YOUR E2.1 SERVER
+═══════════════════════════════════════════════════════════════════════════════
+
+  ssh -i ~/.ssh/YOUR_KEY.pem ubuntu@YOUR_E2_PUBLIC_IP
+
+  # Example:
+  # ssh -i ~/.ssh/oracle_key.pem ubuntu@203.0.113.45
+
+═══════════════════════════════════════════════════════════════════════════════
+ STEP 2: SYSTEM UPDATE & ESSENTIALS
+═══════════════════════════════════════════════════════════════════════════════
+
+  sudo apt update && sudo apt upgrade -y
+
+  sudo apt install -y     git curl wget unzip nano build-essential     software-properties-common apt-transport-https     ca-certificates gnupg lsb-release net-tools     ufw fail2ban nginx python3 python3-pip     python3-venv nodejs npm
+
+═══════════════════════════════════════════════════════════════════════════════
+ STEP 3: FIREWALL SETUP (UFW)
+═══════════════════════════════════════════════════════════════════════════════
+
+  sudo ufw default deny incoming
+  sudo ufw default allow outgoing
+  sudo ufw allow 22/tcp      # SSH — NEVER BLOCK THIS
+  sudo ufw allow 80/tcp      # HTTP
+  sudo ufw allow 443/tcp     # HTTPS
+  sudo ufw allow 8000/tcp    # FastAPI backend (adjust if your app uses different port)
+  sudo ufw allow 3000/tcp    # React dev server (if needed)
+  sudo ufw allow 8080/tcp    # ORDS / alternative port
+  sudo ufw enable
+
+  # Verify:
+  sudo ufw status verbose
+
+═══════════════════════════════════════════════════════════════════════════════
+ STEP 4: ORACLE INSTANT CLIENT (For Database Connectivity)
+═══════════════════════════════════════════════════════════════════════════════
+
+  # Create directory
+  sudo mkdir -p /opt/oracle
+  cd /opt/oracle
+
+  # Download Oracle Instant Client 23.4 (matches 26ai)
+  sudo wget https://download.oracle.com/otn_software/linux/instantclient/2340000/instantclient-basic-linux.x64-23.4.0.24.05.zip
+
+  sudo unzip instantclient-basic-linux.x64-23.4.0.24.05.zip
+
+  # Install required library
+  sudo apt install -y libaio1
+
+  # Set environment variables (PERMANENT)
+  echo 'export ORACLE_HOME=/opt/oracle/instantclient_23_4' >> ~/.bashrc
+  echo 'export PATH=$ORACLE_HOME:$PATH' >> ~/.bashrc
+  echo 'export LD_LIBRARY_PATH=$ORACLE_HOME:$LD_LIBRARY_PATH' >> ~/.bashrc
+  echo 'export TNS_ADMIN=/home/ubuntu/oracle_wallet' >> ~/.bashrc
+
+  # Apply immediately
+  source ~/.bashrc
+
+═══════════════════════════════════════════════════════════════════════════════
+ STEP 5: DATABASE WALLET SETUP
+═══════════════════════════════════════════════════════════════════════════════
+
+  # Create wallet directory
+  mkdir -p ~/oracle_wallet
+  cd ~/oracle_wallet
+
+  # Upload your wallet ZIP from your local machine (in a NEW terminal):
+  # scp -i ~/.ssh/YOUR_KEY.pem ~/Downloads/Wallet_YOURDB.zip ubuntu@YOUR_E2_IP:~/oracle_wallet/
+
+  # Back on server, unzip it:
+  unzip Wallet_*.zip
+
+  # Verify tnsnames.ora exists:
+  ls -la ~/oracle_wallet/tnsnames.ora
+
+═══════════════════════════════════════════════════════════════════════════════
+ STEP 6: CLONE YOUR PROJECT
+═══════════════════════════════════════════════════════════════════════════════
+
+  cd ~
+  git clone https://github.com/SeVin-DEV/Oracle.git
+  cd Oracle
+
+═══════════════════════════════════════════════════════════════════════════════
+ STEP 7: PYTHON ENVIRONMENT & DEPENDENCIES
+═══════════════════════════════════════════════════════════════════════════════
+
+  # Create virtual environment
+  python3 -m venv venv
+  source venv/bin/activate
+
+  # Install requirements
+  pip install --upgrade pip
+  pip install -r requirements.txt
+
+  # CRITICAL: Install Oracle driver
+  pip install oracledb
+
+  # Verify installation
+  python3 -c "import oracledb; print(oracledb.__version__)"
+
+═══════════════════════════════════════════════════════════════════════════════
+ STEP 8: ENVIRONMENT VARIABLES (Database Connection)
+═══════════════════════════════════════════════════════════════════════════════
+
+  # Create .env file in project root
+  nano ~/Oracle/.env
+
+  # Paste this (replace with YOUR actual values):
+  ─────────────────────────────────────────
+  ORACLE_USER=ADMIN
+  ORACLE_PASSWORD=Your_DB_Password_123
+  ORACLE_DSN=yourdb_high
+  # OR for direct connection:
+  # ORACLE_DSN=(description=(retry_count=20)(retry_delay=3)(address=(protocol=tcps)(port=1522)(host=adb.us-phoenix-1.oraclecloud.com))(connect_data=(service_name=your_service_name))(security=(ssl_server_dn_match=yes)))
+
+  # FastAPI settings
+  PORT=8000
+  HOST=0.0.0.0
+
+  # LLM API Key (if using OpenAI/Claude/etc)
+  OPENAI_API_KEY=sk-your-key-here
+  # or
+  ANTHROPIC_API_KEY=sk-ant-your-key-here
+  ─────────────────────────────────────────
+
+  # Also add to ~/.bashrc for system-wide access:
+  echo 'export ORACLE_USER=ADMIN' >> ~/.bashrc
+  echo 'export ORACLE_PASSWORD=Your_DB_Password_123' >> ~/.bashrc
+  echo 'export ORACLE_DSN=yourdb_high' >> ~/.bashrc
+  source ~/.bashrc
+
+═══════════════════════════════════════════════════════════════════════════════
+ STEP 9: DATABASE SETUP (SQL Files in Order)
+═══════════════════════════════════════════════════════════════════════════════
+
+  # Method A: Using SQLcl (Oracle SQL Command Line) — RECOMMENDED
+  # Download SQLcl if not available:
+  cd /opt
+  sudo wget https://download.oracle.com/otn_software/java/sqldeveloper/sqlcl-23.4.0.023.2321.zip
+  sudo unzip sqlcl-*.zip
+  echo 'export PATH=/opt/sqlcl/bin:$PATH' >> ~/.bashrc
+  source ~/.bashrc
+
+  # Run SQL files in EXACT order:
+  cd ~/Oracle/database
+
+  sqlcl ADMIN/Your_DB_Password@yourdb_high @01_schema.sql
+  sqlcl ADMIN/Your_DB_Password@yourdb_high @02_seed_identity.sql
+  sqlcl ADMIN/Your_DB_Password@yourdb_high @03_cognitive_engine.sql
+  sqlcl ADMIN/Your_DB_Password@yourdb_high @04_vector_bridge.sql
+  sqlcl ADMIN/Your_DB_Password@yourdb_high @05_spatial_memory.sql
+  sqlcl ADMIN/Your_DB_Password@yourdb_high @06_scheduler_jobs.sql
+  sqlcl ADMIN/Your_DB_Password@yourdb_high @07_ords_api.sql
+
+  # Method B: Using SQL*Plus (if sqlcl not available)
+  sqlplus ADMIN/Your_DB_Password@yourdb_high @01_schema.sql
+  # ... etc for each file
+
+  # Method C: Using Oracle Database Actions (Web UI)
+  # 1. Go to OCI Console → Autonomous DB → Database Actions → SQL
+  # 2. Open each .sql file and run individually in order
+
+═══════════════════════════════════════════════════════════════════════════════
+ STEP 10: ENABLE SCHEDULER JOBS (Autonomous Cognition)
+═══════════════════════════════════════════════════════════════════════════════
+
+  # Connect to database
+  sqlcl ADMIN/Your_DB_Password@yourdb_high
+
+  # Enable all scheduler jobs:
+  BEGIN
+    DBMS_SCHEDULER.enable('SNS_COGNITION_MASTER');
+    DBMS_SCHEDULER.enable('SNS_INTROSPECTION_STREAM');
+    DBMS_SCHEDULER.enable('SNS_MEMORY_CONSOLIDATION');
+    DBMS_SCHEDULER.enable('SNS_EMOTIONAL_DECAY');
+    DBMS_SCHEDULER.enable('SNS_GOAL_GENERATION');
+  END;
+  /
+
+  # Verify jobs are running:
+  SELECT job_name, state, last_start_date, next_run_date
+  FROM user_scheduler_jobs
+  WHERE job_name LIKE 'SNS_%';
+
+  # Exit SQLcl
+  exit
+
+═══════════════════════════════════════════════════════════════════════════════
+ STEP 11: VERIFY DATABASE CONNECTION FROM PYTHON
+═══════════════════════════════════════════════════════════════════════════════
+
+  # Test script
+  python3 -c "
+  import oracledb
+  import os
+  conn = oracledb.connect(
+      user=os.getenv('ORACLE_USER'),
+      password=os.getenv('ORACLE_PASSWORD'),
+      dsn=os.getenv('ORACLE_DSN')
+  )
+  cursor = conn.cursor()
+  cursor.execute('SELECT * FROM sns_self_model FETCH FIRST 5 ROWS ONLY')
+  for row in cursor:
+      print(row)
+  conn.close()
+  print('✅ Database connection successful!')
+  "
+
+═══════════════════════════════════════════════════════════════════════════════
+ STEP 12: MODIFY main.py (One-Line Change)
+═══════════════════════════════════════════════════════════════════════════════
+
+  # Open main.py
+  nano ~/Oracle/main.py
+
+  # Find this line:
+  # from core.engine import run_cognitive_cycle
+
+  # Change it to:
+  from bridge.engine_adapter import run_cognitive_cycle_oracle
+
+  # Also update the function call if needed:
+  # run_cognitive_cycle() → run_cognitive_cycle_oracle()
+
+  # Save: Ctrl+O, Enter, Ctrl+X
+
+═══════════════════════════════════════════════════════════════════════════════
+ STEP 13: START THE APPLICATION
+═══════════════════════════════════════════════════════════════════════════════
+
+  # Method A: Direct run (for testing)
+  cd ~/Oracle
+  source venv/bin/activate
+  python3 main.py
+
+  # You should see:
+  # Uvicorn running on http://0.0.0.0:8000
+
+  # Method B: Using your start.sh script
+  chmod +x start.sh
+  ./start.sh
+
+  # Method C: Production with PM2 (Node.js style) or Systemd
+  # For Python, use systemd (see Step 15)
+
+═══════════════════════════════════════════════════════════════════════════════
+ STEP 14: REACT DASHBOARD (Frontend)
+═══════════════════════════════════════════════════════════════════════════════
+
+  cd ~/Oracle/front
+
+  # Install dependencies
+  npm install
+
+  # Create .env file for frontend
+  echo 'VITE_ORDS_BASE_URL=https://your-ords-url.oraclecloud.com/ords/sns/' > .env
+  # OR if using local FastAPI:
+  echo 'VITE_API_BASE_URL=http://YOUR_E2_IP:8000' > .env
+
+  # Build for production
+  npm run build
+
+  # The build output goes to 'dist/' — serve with Nginx (see Step 16)
+
+  # For development (if needed):
+  npm run dev
+  # (Runs on port 3000 or 5173 depending on Vite config)
+
+═══════════════════════════════════════════════════════════════════════════════
+ STEP 15: SYSTEMD SERVICE (Auto-Start on Boot)
+═══════════════════════════════════════════════════════════════════════════════
+
+  # Create service file
+  sudo nano /etc/systemd/system/7-agent.service
+
+  # Paste this:
+  ─────────────────────────────────────────
+  [Unit]
+  Description=7-Agent-1 Oracle Cognitive System
+  After=network.target
+
+  [Service]
+  Type=simple
+  User=ubuntu
+  WorkingDirectory=/home/ubuntu/Oracle
+  Environment=ORACLE_USER=ADMIN
+  Environment=ORACLE_PASSWORD=Your_DB_Password_123
+  Environment=ORACLE_DSN=yourdb_high
+  Environment=PATH=/home/ubuntu/Oracle/venv/bin:/usr/local/bin:/usr/bin:/bin
+  Environment=PYTHONPATH=/home/ubuntu/Oracle
+  ExecStart=/home/ubuntu/Oracle/venv/bin/python3 /home/ubuntu/Oracle/main.py
+  Restart=always
+  RestartSec=5
+  StandardOutput=journal
+  StandardError=journal
+
+  [Install]
+  WantedBy=multi-user.target
+  ─────────────────────────────────────────
+
+  # Enable and start
+  sudo systemctl daemon-reload
+  sudo systemctl enable 7-agent
+  sudo systemctl start 7-agent
+
+  # Check status
+  sudo systemctl status 7-agent
+
+  # View logs
+  sudo journalctl -u 7-agent -f
+
+═══════════════════════════════════════════════════════════════════════════════
+ STEP 16: NGINX REVERSE PROXY (Production)
+═══════════════════════════════════════════════════════════════════════════════
+
+  # Remove default site
+  sudo rm /etc/nginx/sites-enabled/default
+
+  # Create your config
+  sudo nano /etc/nginx/sites-available/7-agent
+
+  # Paste this:
+  ─────────────────────────────────────────
+  server {
+      listen 80;
+      server_name YOUR_DOMAIN_OR_IP;
+
+      # Frontend (React build)
+      location / {
+          root /home/ubuntu/Oracle/front/dist;
+          index index.html;
+          try_files $uri $uri/ /index.html;
+      }
+
+      # Backend API (FastAPI)
+      location /api/ {
+          proxy_pass http://localhost:8000/;
+          proxy_http_version 1.1;
+          proxy_set_header Upgrade $http_upgrade;
+          proxy_set_header Connection 'upgrade';
+          proxy_set_header Host $host;
+          proxy_set_header X-Real-IP $remote_addr;
+          proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+          proxy_set_header X-Forwarded-Proto $scheme;
+          proxy_cache_bypass $http_upgrade;
+      }
+
+      # WebSocket support (if needed)
+      location /ws/ {
+          proxy_pass http://localhost:8000/ws/;
+          proxy_http_version 1.1;
+          proxy_set_header Upgrade $http_upgrade;
+          proxy_set_header Connection "upgrade";
+      }
+  }
+  ─────────────────────────────────────────
+
+  sudo ln -s /etc/nginx/sites-available/7-agent /etc/nginx/sites-enabled/
+  sudo nginx -t
+  sudo systemctl restart nginx
+
+═══════════════════════════════════════════════════════════════════════════════
+ STEP 17: SSL WITH CERTBOT (HTTPS)
+═══════════════════════════════════════════════════════════════════════════════
+
+  sudo snap install certbot --classic
+  sudo certbot --nginx -d yourdomain.com
+
+  # Auto-renewal is set up automatically
+  # Test renewal:
+  sudo certbot renew --dry-run
+
+═══════════════════════════════════════════════════════════════════════════════
+ STEP 18: QUICK TROUBLESHOOTING
+═══════════════════════════════════════════════════════════════════════════════
+
+  ❌ "ORA-12154: TNS:could not resolve the connect identifier"
+  → Check tnsnames.ora in ~/oracle_wallet
+  → Verify ORACLE_DSN matches the name in tnsnames.ora
+  → Try full connection string instead of TNS name
+
+  ❌ "ORA-28000: the account is locked"
+  → Connect as ADMIN and unlock:
+    ALTER USER your_user ACCOUNT UNLOCK;
+
+  ❌ "DPI-1047: Cannot locate a 64-bit Oracle Client library"
+  → Verify LD_LIBRARY_PATH includes /opt/oracle/instantclient_23_4
+  → Run: sudo ldconfig (after adding to /etc/ld.so.conf.d/oracle.conf)
+
+  ❌ "Module not found: bridge.engine_adapter"
+  → Check that bridge/ directory exists with __init__.py
+  → Verify PYTHONPATH includes /home/ubuntu/Oracle
+
+  ❌ Scheduler jobs not running
+  → Check: SELECT * FROM user_scheduler_job_run_details WHERE job_name LIKE 'SNS_%';
+  → Verify job state: SELECT job_name, state FROM user_scheduler_jobs;
+
+═══════════════════════════════════════════════════════════════════════════════
+ USEFUL DAILY COMMANDS
+═══════════════════════════════════════════════════════════════════════════════
+
+  # Check if app is running
+  sudo systemctl status 7-agent
+
+  # Restart app
+  sudo systemctl restart 7-agent
+
+  # View live logs
+  sudo journalctl -u 7-agent -f
+
+  # Check database jobs
+  sqlcl ADMIN/pass@db "SELECT job_name, state FROM user_scheduler_jobs WHERE job_name LIKE 'SNS_%';"
+
+  # Check Nginx status
+  sudo systemctl status nginx
+
+  # Check firewall
+  sudo ufw status
+
+  # Update code and restart
+  cd ~/Oracle && git pull && sudo systemctl restart 7-agent
+
+═══════════════════════════════════════════════════════════════════════════════
+ FILE STRUCTURE REFERENCE
+═══════════════════════════════════════════════════════════════════════════════
+
+  Oracle/
+  ├── main.py                    ← Entry point (FastAPI server)
+  ├── requirements.txt           ← Python dependencies
+  ├── .env                       ← Environment variables (create this!)
+  ├── install.sh                 ← Your auto-install script
+  ├── start.sh                   ← Your auto-start script
+  ├── soul.md                    ← Original static identity
+  ├── belief_graph.json          ← Original flat beliefs
+  ├── chat_history.json          ← Original linear history
+  ├── core/                      ← Original 7-1 core modules
+  │   ├── engine.py
+  │   ├── belief_graph.py
+  │   ├── persistence.py
+  │   ├── patch_bus_driver.py
+  │   └── manual_manager.py
+  ├── bridge/                    ← NEW: Oracle integration
+  │   ├── oracle_bridge.py       ← Replaces persistence.py
+  │   ├── engine_adapter.py      ← Replaces engine.py
+  │   ├── belief_adapter.py      ← Adapts belief_graph.py
+  │   └── context_builder.py     ← Replaces soul.md
+  ├── database/                  ← NEW: Oracle SQL files
+  │   ├── 01_schema.sql
+  │   ├── 02_seed_identity.sql
+  │   ├── 03_cognitive_engine.sql
+  │   ├── 04_vector_bridge.sql
+  │   ├── 05_spatial_memory.sql
+  │   ├── 06_scheduler_jobs.sql
+  │   └── 07_ords_api.sql
+  ├── front/                     ← NEW: React dashboard
+  │   ├── src/
+  │   ├── public/
+  │   └── package.json
+  ├── app/                       ← Original app modules
+  ├── identity/                  ← Original identity modules
+  ├── tools/                     ← Original tool modules
+  ├── patches/                   ← Original patch modules
+  └── assets/                    ← Static assets
+
+═══════════════════════════════════════════════════════════════════════════════
+ YOU'RE DONE! 🖤
+═══════════════════════════════════════════════════════════════════════════════
+
+  Your 7-Agent-1 system should now be:
+  ✅ Running on your E2.1 instance
+  ✅ Connected to Oracle 26ai Autonomous Database
+  ✅ Using vector semantic memory instead of flat JSON
+  ✅ Using 3D spatial memory palaces
+  ✅ Persisting emotional state across cycles
+  ✅ Evolving its self-model from experience
+  ✅ Running autonomous background cognition via DBMS_SCHEDULER
+  ✅ Visualized through the React dashboard
+
+  Access points:
+  • API:     http://YOUR_E2_IP:8000
+  • Web UI:  http://YOUR_E2_IP (via Nginx)
+  • Dashboard: http://YOUR_E2_IP (React frontend)
+
+═══════════════════════════════════════════════════════════════════════════════

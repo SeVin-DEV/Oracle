@@ -1,0 +1,110 @@
+
+╔══════════════════════════════════════════════════════════════════════════════╗
+║           🖤 ORACLE 26ai DATABASE SETUP — SQL EXECUTION GUIDE 🖤             ║
+╚══════════════════════════════════════════════════════════════════════════════╝
+
+═══════════════════════════════════════════════════════════════════════════════
+ METHOD 1: SQLcl (Command Line) — RECOMMENDED
+═══════════════════════════════════════════════════════════════════════════════
+
+  # Install SQLcl (one time)
+  cd /opt
+  sudo wget https://download.oracle.com/otn_software/java/sqldeveloper/sqlcl-latest.zip
+  sudo unzip sqlcl-latest.zip
+  echo 'export PATH=/opt/sqlcl/bin:$PATH' >> ~/.bashrc
+  source ~/.bashrc
+
+  # Run ALL files in order (copy-paste each line):
+  ─────────────────────────────────────────────────────────────────────────────
+  cd ~/Oracle/database
+
+  sqlcl ADMIN/YourPassword@yourdb_high @01_schema.sql
+  sqlcl ADMIN/YourPassword@yourdb_high @02_seed_identity.sql
+  sqlcl ADMIN/YourPassword@yourdb_high @03_cognitive_engine.sql
+  sqlcl ADMIN/YourPassword@yourdb_high @04_vector_bridge.sql
+  sqlcl ADMIN/YourPassword@yourdb_high @05_spatial_memory.sql
+  sqlcl ADMIN/YourPassword@yourdb_high @06_scheduler_jobs.sql
+  sqlcl ADMIN/YourPassword@yourdb_high @07_ords_api.sql
+  ─────────────────────────────────────────────────────────────────────────────
+
+═══════════════════════════════════════════════════════════════════════════════
+ METHOD 2: SQL*Plus (If SQLcl unavailable)
+═══════════════════════════════════════════════════════════════════════════════
+
+  cd ~/Oracle/database
+
+  sqlplus ADMIN/YourPassword@yourdb_high @01_schema.sql
+  sqlplus ADMIN/YourPassword@yourdb_high @02_seed_identity.sql
+  sqlplus ADMIN/YourPassword@yourdb_high @03_cognitive_engine.sql
+  sqlplus ADMIN/YourPassword@yourdb_high @04_vector_bridge.sql
+  sqlplus ADMIN/YourPassword@yourdb_high @05_spatial_memory.sql
+  sqlplus ADMIN/YourPassword@yourdb_high @06_scheduler_jobs.sql
+  sqlplus ADMIN/YourPassword@yourdb_high @07_ords_api.sql
+
+═══════════════════════════════════════════════════════════════════════════════
+ METHOD 3: Oracle Database Actions (Web Browser)
+═══════════════════════════════════════════════════════════════════════════════
+
+  1. Go to: OCI Console → Oracle Database → Autonomous Database
+  2. Click your database name
+  3. Click "Database Actions" → "SQL"
+  4. For EACH file (01 through 07):
+     a. Open the .sql file in a text editor
+     b. Copy ALL contents
+     c. Paste into the SQL worksheet
+     d. Click "Run Script" (not just Run Statement!)
+     e. Wait for "Script completed successfully"
+     f. Move to next file
+
+═══════════════════════════════════════════════════════════════════════════════
+ ENABLE SCHEDULER JOBS (After all SQL files run)
+═══════════════════════════════════════════════════════════════════════════════
+
+  sqlcl ADMIN/YourPassword@yourdb_high
+
+  -- Paste this block:
+  BEGIN
+    DBMS_SCHEDULER.enable('SNS_COGNITION_MASTER');
+    DBMS_SCHEDULER.enable('SNS_INTROSPECTION_STREAM');
+    DBMS_SCHEDULER.enable('SNS_MEMORY_CONSOLIDATION');
+    DBMS_SCHEDULER.enable('SNS_EMOTIONAL_DECAY');
+    DBMS_SCHEDULER.enable('SNS_GOAL_GENERATION');
+  END;
+  /
+
+  -- Verify:
+  SELECT job_name, state, last_start_date, next_run_date
+  FROM user_scheduler_jobs
+  WHERE job_name LIKE 'SNS_%';
+
+  -- Exit:
+  exit
+
+═══════════════════════════════════════════════════════════════════════════════
+ VERIFY DATABASE OBJECTS
+═══════════════════════════════════════════════════════════════════════════════
+
+  -- List all tables
+  SELECT table_name FROM user_tables WHERE table_name LIKE 'SNS_%' ORDER BY table_name;
+
+  -- Should show:
+  -- SNS_BELIEFS
+  -- SNS_DRIVES
+  -- SNS_EMOTIONAL_STATE
+  -- SNS_GOALS
+  -- SNS_INTROSPECTION_LOG
+  -- SNS_MEMORY_PALACES
+  -- SNS_NEURONS
+  -- SNS_PERCEPTIONS
+  -- SNS_SELF_MODEL
+  -- SNS_SESSIONS
+  -- SNS_SPATIAL_MEMORIES
+  -- SNS_SYNAPSES
+
+  -- Check seed data
+  SELECT attribute_name, certainty FROM sns_self_model FETCH FIRST 10 ROWS ONLY;
+
+  -- Check scheduler jobs
+  SELECT job_name, state, repeat_interval FROM user_scheduler_jobs;
+
+═══════════════════════════════════════════════════════════════════════════════
